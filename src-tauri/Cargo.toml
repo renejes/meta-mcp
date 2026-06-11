@@ -1,6 +1,6 @@
 [package]
 name = "meta-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "Meta-MCP — aggregating MCP proxy"
 authors = ["Meta-MCP"]
 edition = "2021"

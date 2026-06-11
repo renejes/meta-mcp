@@ -116,7 +116,7 @@ async fn handle_jsonrpc(state: &ProxyStateInner, req: &Value) -> Option<Value> {
                 json!({
                     "protocolVersion": version,
                     "capabilities": { "tools": {} },
-                    "serverInfo": { "name": "meta-mcp", "version": "0.1.0" }
+                    "serverInfo": { "name": "meta-mcp", "version": "0.1.1" }
                 }),
             ))
         }

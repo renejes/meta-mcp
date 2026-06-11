@@ -41,8 +41,8 @@ you point Claude at Meta-MCP once and flip switches in the app.
 
 - **Two client transports** on port `3663`: legacy **HTTP+SSE** (`GET /sse` +
   `POST /message`) and modern **Streamable HTTP** (`POST /mcp`).
-- **Two backend transports**: spawns `stdio` MCP servers as child processes and
-  connects to remote `sse` servers.
+- **Three backend transports**: spawns `stdio` MCP servers as child processes and
+  connects to remote servers over **Streamable HTTP** or legacy **SSE**.
 - **Tool aggregation** with readable name prefixing — `{server-slug}__{tool}`
   (e.g. `github__create_issue`). Collisions get a numeric suffix; the router splits on
   the first `__` only and strips the prefix before forwarding.
@@ -152,9 +152,10 @@ src-tauri/src/
     ├── server.rs           # axum: SSE + Streamable HTTP + /register, JSON-RPC core
     ├── aggregator.rs       # prefixed tool list + slug→id map (cached)
     ├── router.rs           # tools/call → correct backend (strip prefix)
-    ├── backend.rs          # Backend enum over the two transports
+    ├── backend.rs          # Backend enum over the three transports
     ├── child.rs            # stdio child-process MCP client
-    └── sse_client.rs       # remote SSE MCP client
+    ├── sse_client.rs       # remote SSE MCP client
+    └── http_client.rs      # remote Streamable HTTP MCP client
 
 src/                        # Svelte 5 + Tailwind v4 + Material Symbols
 ├── App.svelte              # orchestrator
