@@ -37,6 +37,7 @@ impl SseBackend {
 
         let client = reqwest::Client::builder()
             .pool_idle_timeout(None)
+            .default_headers(super::build_header_map(&entry.headers))
             .build()?;
 
         let resp = client

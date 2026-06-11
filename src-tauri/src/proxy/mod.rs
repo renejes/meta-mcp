@@ -16,9 +16,28 @@ use uuid::Uuid;
 
 use aggregator::CachedTools;
 use backend::Backend;
-use crate::config::{self, Config, ProxyStatus, ServerEntry, ServerStatus};
+use crate::config::{self, Config, ProxyStatus, ServerEntry, ServerStatus, Transport};
 
 pub const PROXY_PORT: u16 = 3663;
+
+/// Build a reqwest `HeaderMap` from a server's optional header map, skipping any
+/// entries that aren't valid HTTP header names/values.
+pub(crate) fn build_header_map(
+    headers: &Option<HashMap<String, String>>,
+) -> reqwest::header::HeaderMap {
+    let mut map = reqwest::header::HeaderMap::new();
+    if let Some(h) = headers {
+        for (k, v) in h {
+            if let (Ok(name), Ok(val)) = (
+                reqwest::header::HeaderName::from_bytes(k.as_bytes()),
+                reqwest::header::HeaderValue::from_str(v),
+            ) {
+                map.insert(name, val);
+            }
+        }
+    }
+    map
+}
 
 /// Shared, reference-counted proxy state. Stored in Tauri's managed state.
 pub type ProxyState = Arc<ProxyStateInner>;
@@ -33,6 +52,8 @@ pub struct ProxyStateInner {
     pub backends: RwLock<HashMap<String, BackendHandle>>,
     /// Active servers whose connection attempt failed.
     pub failed: RwLock<HashSet<String>>,
+    /// Active remote servers that returned 401 — they need an OAuth login.
+    pub needs_auth: RwLock<HashSet<String>>,
     pub tool_cache: RwLock<Option<CachedTools>>,
     /// Legacy-SSE client sessions: session id → SSE event sender.
     pub sessions: Mutex<HashMap<String, tokio::sync::mpsc::UnboundedSender<String>>>,
@@ -47,6 +68,7 @@ impl ProxyStateInner {
             config_path,
             backends: RwLock::new(HashMap::new()),
             failed: RwLock::new(HashSet::new()),
+            needs_auth: RwLock::new(HashSet::new()),
             tool_cache: RwLock::new(None),
             sessions: Mutex::new(HashMap::new()),
             status: RwLock::new(ProxyStatus {
@@ -139,6 +161,15 @@ impl ProxyStateInner {
             handle.lock().await.shutdown().await;
         }
         self.failed.write().await.remove(id);
+        self.needs_auth.write().await.remove(id);
+    }
+
+    /// Path of the OAuth token store (next to config.json).
+    pub fn oauth_path(&self) -> PathBuf {
+        self.config_path
+            .parent()
+            .map(|p| p.join("oauth.json"))
+            .unwrap_or_else(|| PathBuf::from("oauth.json"))
     }
 
     /// Spawn/kill backends until the connected set matches the active set,
@@ -164,11 +195,26 @@ impl ProxyStateInner {
 
         // Spawn newly active backends (in parallel).
         let current_set: HashSet<String> = self.backends.read().await.keys().cloned().collect();
-        let to_spawn: Vec<ServerEntry> = active
+        let mut to_spawn: Vec<ServerEntry> = active
             .iter()
             .filter(|id| !current_set.contains(*id))
             .filter_map(|id| servers.get(id).cloned())
             .collect();
+
+        // Inject the stored OAuth access token (refreshing if needed) as a Bearer
+        // header for remote backends, on top of any user-supplied headers.
+        let oauth_path = self.oauth_path();
+        for entry in &mut to_spawn {
+            if matches!(entry.transport, Transport::Sse | Transport::Http) {
+                if let Some(token) =
+                    crate::oauth::valid_access_token(&oauth_path, &entry.id).await
+                {
+                    let mut headers = entry.headers.clone().unwrap_or_default();
+                    headers.insert("Authorization".into(), format!("Bearer {token}"));
+                    entry.headers = Some(headers);
+                }
+            }
+        }
 
         let results = futures::future::join_all(to_spawn.into_iter().map(|entry| async move {
             let r = Backend::connect(&entry).await;
@@ -184,13 +230,22 @@ impl ProxyStateInner {
                         .await
                         .insert(entry.id.clone(), Arc::new(Mutex::new(backend)));
                     self.failed.write().await.remove(&entry.id);
+                    self.needs_auth.write().await.remove(&entry.id);
                 }
                 Err(e) => {
                     eprintln!(
                         "[meta-mcp] could not connect '{}' ({}): {}",
                         entry.name, entry.id, e
                     );
-                    self.failed.write().await.insert(entry.id.clone());
+                    let remote = matches!(entry.transport, Transport::Sse | Transport::Http);
+                    let unauthorized = e.to_string().contains("401");
+                    if remote && unauthorized {
+                        self.needs_auth.write().await.insert(entry.id.clone());
+                        self.failed.write().await.remove(&entry.id);
+                    } else {
+                        self.failed.write().await.insert(entry.id.clone());
+                        self.needs_auth.write().await.remove(&entry.id);
+                    }
                 }
             }
         }
@@ -204,6 +259,8 @@ impl ProxyStateInner {
         self.ensure_cache().await;
         let active = self.active_ids().await;
         let backends = self.backends.read().await;
+        let needs_auth = self.needs_auth.read().await;
+        let authed = crate::oauth::record_ids(&self.oauth_path());
         let cache = self.tool_cache.read().await;
         let cfg = self.config.read().await;
         cfg.servers
@@ -217,10 +274,36 @@ impl ProxyStateInner {
                     id: s.id.clone(),
                     active: active.contains(&s.id),
                     connected: backends.contains_key(&s.id),
+                    needs_auth: needs_auth.contains(&s.id),
+                    authenticated: authed.contains(&s.id),
                     tool_count,
                 }
             })
             .collect()
+    }
+
+    /// Run the interactive OAuth login for a server, then reconnect.
+    pub async fn oauth_login(&self, server_id: &str) -> Result<(), String> {
+        let url = {
+            let cfg = self.config.read().await;
+            cfg.servers
+                .iter()
+                .find(|s| s.id == server_id)
+                .and_then(|s| s.url.clone())
+        }
+        .ok_or_else(|| "server has no url".to_string())?;
+        crate::oauth::login(&self.oauth_path(), server_id, &url)
+            .await
+            .map_err(|e| e.to_string())?;
+        self.reconcile().await;
+        Ok(())
+    }
+
+    /// Forget a server's OAuth tokens and reconnect (it will need login again).
+    pub async fn oauth_logout(&self, server_id: &str) {
+        crate::oauth::forget(&self.oauth_path(), server_id);
+        self.drop_backend(server_id).await;
+        self.reconcile().await;
     }
 
     /// Kill every backend (used on app quit).

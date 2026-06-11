@@ -27,6 +27,11 @@
       ? Object.entries(initial.env).map(([key, value]) => ({ key, value }))
       : [],
   );
+  let headerPairs = $state<{ key: string; value: string }[]>(
+    initial?.headers
+      ? Object.entries(initial.headers).map(([key, value]) => ({ key, value }))
+      : [],
+  );
 
   let attempted = $state(false);
 
@@ -51,6 +56,15 @@
   function removeEnv(i: number) {
     envPairs = envPairs.filter((_, idx) => idx !== i);
   }
+  function addHeader() {
+    headerPairs = [...headerPairs, { key: "", value: "" }];
+  }
+  function addBearer() {
+    headerPairs = [...headerPairs, { key: "Authorization", value: "Bearer " }];
+  }
+  function removeHeader(i: number) {
+    headerPairs = headerPairs.filter((_, idx) => idx !== i);
+  }
 
   function save() {
     attempted = true;
@@ -74,6 +88,11 @@
       if (Object.keys(env).length) entry.env = env;
     } else {
       entry.url = url.trim();
+      const headers: Record<string, string> = {};
+      for (const { key, value } of headerPairs) {
+        if (key.trim()) headers[key.trim()] = value;
+      }
+      if (Object.keys(headers).length) entry.headers = headers;
     }
 
     onSave(entry);
@@ -188,6 +207,34 @@
             <Icon name="error" size={14} />Bitte eine gültige http(s)-URL angeben.
           </span>
         {/if}
+      </div>
+
+      <div class="mb-4">
+        <span class="mb-1.5 block text-xs text-muted">Header (z.B. Auth)</span>
+        <div class="space-y-1.5">
+          {#each headerPairs as pair, i (i)}
+            <div class="flex gap-2">
+              <input class="field-input font-mono" bind:value={pair.key} placeholder="Header-Name" />
+              <input class="field-input font-mono" bind:value={pair.value} placeholder="Wert" />
+              <button class="btn-icon shrink-0 hover:text-err" onclick={() => removeHeader(i)} aria-label="Entfernen">
+                <Icon name="close" size={18} />
+              </button>
+            </div>
+          {/each}
+        </div>
+        <div class="mt-1.5 flex gap-2">
+          <button class="btn btn-ghost px-2 py-1 text-xs" onclick={addBearer}>
+            <Icon name="key" size={16} />Bearer-Token
+          </button>
+          <button class="btn btn-ghost px-2 py-1 text-xs" onclick={addHeader}>
+            <Icon name="add" size={16} />Header
+          </button>
+        </div>
+        <p class="mt-1.5 text-xs text-faint">
+          Für Server mit Login: Token aus deinem Account einfügen. Braucht der
+          Server interaktiven OAuth-Login, nutze stattdessen den „Login"-Button
+          am Server.
+        </p>
       </div>
     {/if}
 

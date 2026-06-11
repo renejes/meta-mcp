@@ -1937,19 +1937,22 @@ dependencies = [
 
 [[package]]
 name = "meta-mcp"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "axum",
+ "base64 0.22.1",
  "futures",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
  "tokio",
  "tokio-stream",
+ "url",
  "uuid",
 ]
 

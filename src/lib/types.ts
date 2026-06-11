@@ -8,6 +8,7 @@ export interface ServerEntry {
   args?: string[];
   env?: Record<string, string>;
   url?: string;
+  headers?: Record<string, string>;
   active: boolean;
 }
 
@@ -34,6 +35,8 @@ export interface ServerStatus {
   id: string;
   active: boolean;
   connected: boolean;
+  needs_auth: boolean;
+  authenticated: boolean;
   tool_count: number;
 }
 

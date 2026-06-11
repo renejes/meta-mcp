@@ -1,6 +1,7 @@
 mod claude;
 mod commands;
 mod config;
+mod oauth;
 mod proxy;
 mod stdio_bridge;
 
@@ -109,6 +110,8 @@ pub fn run() {
             commands::get_claude_status,
             commands::set_claude_code,
             commands::set_claude_desktop,
+            commands::oauth_login,
+            commands::oauth_logout,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Meta-MCP");

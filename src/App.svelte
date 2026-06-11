@@ -87,6 +87,8 @@
   const toggleServer = (id: string, active: boolean) =>
     run(() => api.setServerActive(id, active))();
   const deleteServer = (id: string) => run(() => api.deleteServer(id))();
+  const loginServer = (id: string) => run(() => api.oauthLogin(id))();
+  const logoutServer = (id: string) => run(() => api.oauthLogout(id))();
 
   // ---- profile actions ----
   const selectProfile = (id: string | null) =>
@@ -228,6 +230,8 @@
       onToggle={toggleServer}
       onEdit={openEdit}
       onDelete={deleteServer}
+      onLogin={loginServer}
+      onLogout={logoutServer}
     />
     <ToolList {tools} />
   {:else}

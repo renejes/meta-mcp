@@ -170,6 +170,19 @@ pub async fn get_server_status(state: State<'_, ProxyState>) -> CmdResult<Vec<Se
     Ok(st.server_status().await)
 }
 
+/// Start the interactive OAuth login for a remote server (opens the browser).
+#[tauri::command]
+pub async fn oauth_login(state: State<'_, ProxyState>, id: String) -> CmdResult<()> {
+    state.inner().clone().oauth_login(&id).await
+}
+
+/// Forget a server's stored OAuth tokens.
+#[tauri::command]
+pub async fn oauth_logout(state: State<'_, ProxyState>, id: String) -> CmdResult<()> {
+    state.inner().clone().oauth_logout(&id).await;
+    Ok(())
+}
+
 /// Read a `claude_desktop_config.json`, map `mcpServers` to entries, and return
 /// the ones whose name does not already exist. Nothing is saved yet.
 #[tauri::command]
@@ -198,14 +211,25 @@ pub async fn import_claude_config(
                 continue;
             }
             let entry = if let Some(url) = def.get("url").and_then(|u| u.as_str()) {
+                // Honour Claude Code's `type` (http / streamable-http / sse).
+                let transport = match def.get("type").and_then(|t| t.as_str()) {
+                    Some("sse") => Transport::Sse,
+                    _ => Transport::Http,
+                };
+                let headers = def.get("headers").and_then(|h| h.as_object()).map(|o| {
+                    o.iter()
+                        .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                        .collect::<HashMap<_, _>>()
+                });
                 ServerEntry {
                     id: Uuid::new_v4().to_string(),
                     name: name.clone(),
-                    transport: Transport::Sse,
+                    transport,
                     command: None,
                     args: None,
                     env: None,
                     url: Some(url.to_string()),
+                    headers,
                     active: false,
                 }
             } else {
@@ -231,6 +255,7 @@ pub async fn import_claude_config(
                     args,
                     env,
                     url: None,
+                    headers: None,
                     active: false,
                 }
             };

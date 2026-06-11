@@ -25,6 +25,8 @@ export const api = {
   getToolList: () => invoke<ToolWithServer[]>("get_tool_list"),
   getServerStatus: () => invoke<ServerStatus[]>("get_server_status"),
   defaultClaudeConfigPath: () => invoke<string>("default_claude_config_path"),
+  oauthLogin: (id: string) => invoke<void>("oauth_login", { id }),
+  oauthLogout: (id: string) => invoke<void>("oauth_logout", { id }),
   getClaudeStatus: () => invoke<ClaudeStatus>("get_claude_status"),
   setClaudeCode: (enabled: boolean) =>
     invoke<void>("set_claude_code", { enabled }),

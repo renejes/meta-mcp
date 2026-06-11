@@ -43,6 +43,11 @@ you point Claude at Meta-MCP once and flip switches in the app.
   `POST /message`) and modern **Streamable HTTP** (`POST /mcp`).
 - **Three backend transports**: spawns `stdio` MCP servers as child processes and
   connects to remote servers over **Streamable HTTP** or legacy **SSE**.
+- **Authenticated remote servers**: send custom headers per server (e.g. a
+  `Authorization: Bearer <token>` you paste from a dashboard) **and** a full
+  interactive **OAuth 2.1** login (discovery, dynamic client registration, PKCE,
+  browser sign-in, token refresh) for servers that require an account — a
+  **Login** button appears when a server returns `401`.
 - **Tool aggregation** with readable name prefixing — `{server-slug}__{tool}`
   (e.g. `github__create_issue`). Collisions get a numeric suffix; the router splits on
   the first `__` only and strips the prefix before forwarding.

@@ -42,6 +42,8 @@ struct RegisterRequest {
     env: Option<HashMap<String, String>>,
     #[serde(default)]
     url: Option<String>,
+    #[serde(default)]
+    headers: Option<HashMap<String, String>>,
     #[serde(default = "default_true")]
     active: bool,
 }
@@ -71,6 +73,7 @@ async fn register_handler(
         args: req.args,
         env: req.env,
         url: req.url,
+        headers: req.headers,
         active: req.active,
     };
     let saved = state.register_server(entry).await;
@@ -116,7 +119,7 @@ async fn handle_jsonrpc(state: &ProxyStateInner, req: &Value) -> Option<Value> {
                 json!({
                     "protocolVersion": version,
                     "capabilities": { "tools": {} },
-                    "serverInfo": { "name": "meta-mcp", "version": "0.1.1" }
+                    "serverInfo": { "name": "meta-mcp", "version": "0.1.2" }
                 }),
             ))
         }

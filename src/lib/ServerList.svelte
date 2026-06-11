@@ -11,6 +11,8 @@
     onToggle,
     onEdit,
     onDelete,
+    onLogin,
+    onLogout,
   }: {
     servers: ServerEntry[];
     statuses: ServerStatus[];
@@ -20,9 +22,12 @@
     onToggle: (id: string, active: boolean) => void;
     onEdit: (server: ServerEntry) => void;
     onDelete: (id: string) => void;
+    onLogin: (id: string) => Promise<void>;
+    onLogout: (id: string) => void;
   } = $props();
 
   let menuOpen = $state<string | null>(null);
+  let loggingIn = $state<string | null>(null);
 
   const statusById = $derived(
     new Map(statuses.map((s) => [s.id, s] as const)),
@@ -30,7 +35,17 @@
 
   function dotClass(s: ServerStatus | undefined): string {
     if (!s || !s.active) return "bg-faint";
+    if (s.needs_auth) return "bg-warn shadow-[0_0_7px_1px_rgba(251,191,36,0.45)]";
     return s.connected ? "bg-ok shadow-[0_0_7px_1px_rgba(52,211,153,0.45)]" : "bg-err";
+  }
+
+  async function login(id: string) {
+    loggingIn = id;
+    try {
+      await onLogin(id);
+    } finally {
+      loggingIn = null;
+    }
   }
 </script>
 
@@ -93,15 +108,18 @@
               </span>
             </div>
             <div
-              class="mt-0.5 flex items-center gap-1 text-xs {s &&
-              s.active &&
-              !s.connected
-                ? 'text-err'
-                : 'text-muted'}"
+              class="mt-0.5 flex items-center gap-1 text-xs {s?.needs_auth
+                ? 'text-warn'
+                : s && s.active && !s.connected
+                  ? 'text-err'
+                  : 'text-muted'}"
             >
               {#if !s || !s.active}
                 <Icon name="radio_button_unchecked" size={14} />
                 inaktiv
+              {:else if s.needs_auth}
+                <Icon name="lock" size={14} />
+                Login erforderlich
               {:else if !s.connected}
                 <Icon name="warning" size={14} />
                 Verbindungsfehler
@@ -109,9 +127,28 @@
                 <Icon name="build" size={14} />
                 {s.tool_count}
                 {s.tool_count === 1 ? "Tool" : "Tools"}
+                {#if s.authenticated}
+                  <Icon name="lock_open" size={13} class="ml-1 text-ok" />
+                {/if}
               {/if}
             </div>
           </div>
+
+          {#if s?.needs_auth}
+            <button
+              class="btn btn-primary shrink-0 px-2.5 py-1.5 text-xs"
+              disabled={loggingIn === server.id}
+              onclick={() => login(server.id)}
+            >
+              {#if loggingIn === server.id}
+                <Icon name="progress_activity" size={16} class="animate-spin" />
+                Warte auf Login…
+              {:else}
+                <Icon name="login" size={16} />
+                Login
+              {/if}
+            </button>
+          {/if}
 
           <label
             class="relative inline-flex shrink-0 cursor-pointer items-center"
@@ -156,6 +193,18 @@
                   <Icon name="edit" size={17} class="text-muted" />
                   Bearbeiten
                 </button>
+                {#if s?.authenticated}
+                  <button
+                    class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-fg hover:bg-surface-3"
+                    onclick={() => {
+                      menuOpen = null;
+                      onLogout(server.id);
+                    }}
+                  >
+                    <Icon name="logout" size={17} class="text-muted" />
+                    Abmelden
+                  </button>
+                {/if}
                 <button
                   class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-err hover:bg-err/10"
                   onclick={() => {

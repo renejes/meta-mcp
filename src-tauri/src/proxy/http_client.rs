@@ -34,7 +34,9 @@ impl StreamableHttpBackend {
             .filter(|u| !u.trim().is_empty())
             .ok_or_else(|| anyhow!("http server '{}' has no url", entry.name))?;
 
-        let client = reqwest::Client::builder().build()?;
+        let client = reqwest::Client::builder()
+            .default_headers(super::build_header_map(&entry.headers))
+            .build()?;
 
         let backend = StreamableHttpBackend {
             client,
@@ -266,6 +268,7 @@ mod tests {
             args: None,
             env: None,
             url: Some(url),
+            headers: None,
             active: true,
         };
         let mut backend = StreamableHttpBackend::connect(&entry)

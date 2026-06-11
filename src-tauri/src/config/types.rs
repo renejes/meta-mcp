@@ -40,9 +40,14 @@ pub struct ServerEntry {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub env: Option<HashMap<String, String>>,
 
-    // sse:
+    // sse / http:
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    /// Extra HTTP headers sent on every request to an http/sse backend
+    /// (e.g. `Authorization: Bearer <token>` or an `X-API-Key`). The OAuth
+    /// access token, when present, is injected here at connect time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub headers: Option<HashMap<String, String>>,
 
     /// Manual toggle (used when no profile is active).
     #[serde(default)]
@@ -74,6 +79,11 @@ pub struct ServerStatus {
     pub id: String,
     pub active: bool,
     pub connected: bool,
+    #[serde(default)]
+    pub needs_auth: bool,
+    /// Has stored OAuth tokens (i.e. the user has logged in).
+    #[serde(default)]
+    pub authenticated: bool,
     pub tool_count: usize,
 }
 
