@@ -1,4 +1,4 @@
-export type Transport = "stdio" | "sse";
+export type Transport = "stdio" | "sse" | "http";
 
 export interface ServerEntry {
   id: string;

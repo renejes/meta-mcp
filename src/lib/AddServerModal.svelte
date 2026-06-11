@@ -33,7 +33,7 @@
   const nameError = $derived(name.trim() === "");
   const commandError = $derived(transport === "stdio" && command.trim() === "");
   const urlError = $derived(
-    transport === "sse" && !/^https?:\/\/.+/i.test(url.trim()),
+    transport !== "stdio" && !/^https?:\/\/.+/i.test(url.trim()),
   );
   const invalid = $derived(
     nameError || (transport === "stdio" ? commandError : urlError),
@@ -117,8 +117,8 @@
 
     <div class="mb-4">
       <span class="mb-1.5 block text-xs text-muted">Transport</span>
-      <div class="grid grid-cols-2 gap-1 rounded-lg border border-line-strong bg-ink p-1">
-        {#each [{ v: "stdio", icon: "terminal", label: "stdio" }, { v: "sse", icon: "cloud", label: "SSE" }] as opt (opt.v)}
+      <div class="grid grid-cols-3 gap-1 rounded-lg border border-line-strong bg-ink p-1">
+        {#each [{ v: "stdio", icon: "terminal", label: "stdio" }, { v: "http", icon: "cloud", label: "HTTP" }, { v: "sse", icon: "cloud", label: "SSE" }] as opt (opt.v)}
           <button
             type="button"
             class="flex items-center justify-center gap-1.5 rounded-md py-1.5 text-sm transition-colors {transport ===
@@ -182,7 +182,7 @@
     {:else}
       <div class="mb-4">
         <label for="srv-url" class="mb-1.5 block text-xs text-muted">URL</label>
-        <input id="srv-url" class="field-input font-mono" bind:value={url} placeholder="http://localhost:8080/sse" />
+        <input id="srv-url" class="field-input font-mono" bind:value={url} placeholder={transport === "http" ? "http://localhost:8080/mcp" : "http://localhost:8080/sse"} />
         {#if attempted && urlError}
           <span class="mt-1.5 flex items-center gap-1 text-xs text-err">
             <Icon name="error" size={14} />Bitte eine gültige http(s)-URL angeben.

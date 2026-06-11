@@ -17,7 +17,11 @@ pub struct Config {
 #[serde(rename_all = "lowercase")]
 pub enum Transport {
     Stdio,
+    /// Legacy HTTP+SSE transport (deprecated by the MCP spec, kept for older servers).
     Sse,
+    /// Streamable HTTP transport (current spec): a single `/mcp` endpoint reached
+    /// with `Mcp-Session-Id` sessions and SSE-framed responses.
+    Http,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

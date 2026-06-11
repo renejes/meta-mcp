@@ -1,6 +1,7 @@
 pub mod aggregator;
 pub mod backend;
 pub mod child;
+pub mod http_client;
 pub mod router;
 pub mod server;
 pub mod sse_client;
