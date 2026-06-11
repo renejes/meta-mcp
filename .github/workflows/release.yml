@@ -1,0 +1,46 @@
+name: Release
+
+# Build the macOS app and publish a GitHub Release whenever a v* tag is pushed.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - run: pnpm install
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Meta-MCP ${{ github.ref_name }}"
+          releaseBody: |
+            Unsigned open-source build. On first launch:
+            `xattr -dr com.apple.quarantine /Applications/Meta-MCP.app`
+            (or right-click → Open). See the README for details.
+          releaseDraft: false
+          prerelease: false
